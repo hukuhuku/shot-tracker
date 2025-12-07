@@ -1,0 +1,641 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend } from 'recharts';
+import { Activity, BarChart2, MapPin, CheckCircle, XCircle, LogOut, Filter } from 'lucide-react';
+import axios from 'axios';
+
+// --- Types & Constants ---
+
+type ZoneCategory = 'Paint' | 'Mid' | '3PT';
+
+interface ShotRecord {
+  id?: number; // DB保存前はないのでOptional
+  date: string;
+  zoneId: string;
+  category: ZoneCategory;
+  makes: number;
+  attempts: number;
+}
+
+interface ZoneDef {
+  id: string;
+  label: string;
+  category: ZoneCategory;
+  path: string; 
+  cx: number;   
+  cy: number;   
+  group?: string; 
+}
+
+// --- Coordinate Calculations (Scale: 1m = 30px) ---
+const COURT_ZONES: ZoneDef[] = [
+  // --- Paint Area ---
+  { 
+    id: 'Paint', label: 'Paint', category: 'Paint', group: 'Paint',
+    path: 'M 176.5 450 L 176.5 276 L 323.5 276 L 323.5 450 Z', 
+    cx: 250, cy: 360 
+  },
+  // --- Mid Range Areas ---
+  { 
+    id: 'Mid-L-Corner', label: 'Mid L-Crnr', category: 'Mid', group: 'Corner',
+    path: 'M 52 450 L 176.5 450 L 176.5 360.5 L 52 360.5 Z', 
+    cx: 114, cy: 405
+  },
+  { 
+    id: 'Mid-L-Wing', label: 'Mid L-Wing', category: 'Mid', group: 'Wing',
+    path: 'M 52 360.5 L 176.5 360.5 L 176.5 214.3 A 202.5 202.5 0 0 0 52 360.5 Z',
+    cx: 125, cy: 280
+  },
+  { 
+    id: 'Mid-Top', label: 'Mid Top', category: 'Mid', group: 'Top',
+    path: 'M 176.5 276 L 323.5 276 L 323.5 214.3 A 202.5 202.5 0 0 0 176.5 214.3 Z', 
+    cx: 250, cy: 235
+  },
+  { 
+    id: 'Mid-R-Wing', label: 'Mid R-Wing', category: 'Mid', group: 'Wing',
+    path: 'M 448 360.5 L 323.5 360.5 L 323.5 214.3 A 202.5 202.5 0 0 1 448 360.5 Z', 
+    cx: 375, cy: 280 
+  },
+  { 
+    id: 'Mid-R-Corner', label: 'Mid R-Crnr', category: 'Mid', group: 'Corner',
+    path: 'M 448 450 L 323.5 450 L 323.5 360.5 L 448 360.5 Z', 
+    cx: 386, cy: 405 
+  },
+  // --- 3 Point Areas ---
+  { 
+    id: '3PT-L-Corner', label: '3PT L-Crnr', category: '3PT', group: 'Corner',
+    path: 'M 0 450 L 52 450 L 52 360.5 L 0 360.5 Z', 
+    cx: 26, cy: 405 
+  },
+  { 
+    id: '3PT-L-Wing', label: '3PT L-Wing', category: '3PT', group: 'Wing',
+    path: 'M 52 360.5 A 202.5 202.5 0 0 1 176.5 214.3 L 176.5 0 L 0 0 L 0 360.5 Z', 
+    cx: 60, cy: 150 
+  },
+  { 
+    id: '3PT-Top', label: '3PT Top', category: '3PT', group: 'Top',
+    path: 'M 176.5 214.3 A 202.5 202.5 0 0 1 323.5 214.3 L 323.5 0 L 176.5 0 Z', 
+    cx: 250, cy: 80 
+  },
+  { 
+    id: '3PT-R-Wing', label: '3PT R-Wing', category: '3PT', group: 'Wing',
+    path: 'M 448 360.5 A 202.5 202.5 0 0 0 323.5 214.3 L 323.5 0 L 500 0 L 500 360.5 Z', 
+    cx: 440, cy: 150 
+  },
+  { 
+    id: '3PT-R-Corner', label: '3PT R-Crnr', category: '3PT', group: 'Corner',
+    path: 'M 500 450 L 448 450 L 448 360.5 L 500 360.5 Z', 
+    cx: 474, cy: 405 
+  },
+];
+
+// --- Heatmap Component ---
+const HeatmapCourt = ({ data }: { data: ShotRecord[] }) => {
+  const zoneStats = useMemo(() => {
+    return COURT_ZONES.reduce((acc, zone) => {
+      const records = data.filter(d => d.zoneId === zone.id);
+      const makes = records.reduce((s, r) => s + r.makes, 0);
+      const attempts = records.reduce((s, r) => s + r.attempts, 0);
+      const pct = attempts > 0 ? Math.round((makes / attempts) * 100) : 0;
+      acc[zone.id] = { makes, attempts, pct };
+      return acc;
+    }, {} as Record<string, { makes: number, attempts: number, pct: number }>);
+  }, [data]);
+
+  const getColor = (pct: number, attempts: number) => {
+    if (attempts === 0) return '#f3f4f6';
+    if (pct >= 50) return '#ef4444'; 
+    if (pct >= 40) return '#f97316'; 
+    if (pct >= 30) return '#eab308'; 
+    return '#3b82f6'; 
+  };
+
+  return (
+    <div className="relative w-full max-w-[500px] mx-auto bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm">
+      <svg viewBox="0 0 500 500" className="w-full h-auto select-none">
+        <rect x="0" y="0" width="500" height="500" fill="#ffffff" />
+        <path d="M 52 450 L 52 360.5 A 202.5 202.5 0 0 1 448 360.5 L 448 450" fill="none" stroke="#e5e7eb" strokeWidth="2" />
+        <rect x="176.5" y="276" width="147" height="174" fill="none" stroke="#e5e7eb" strokeWidth="2" />
+        
+        {COURT_ZONES.map((zone) => {
+          const stats = zoneStats[zone.id] || { pct: 0, makes: 0, attempts: 0 };
+          const color = getColor(stats.pct, stats.attempts);
+          
+          return (
+            <g key={zone.id} className="group">
+              <path 
+                d={zone.path} 
+                fill={color} 
+                stroke="white" 
+                strokeWidth="2"
+                className="transition-colors duration-300 opacity-80 hover:opacity-100"
+              />
+              {stats.attempts > 0 && (
+                <>
+                  <text x={zone.cx} y={zone.cy - 6} textAnchor="middle" className="text-[12px] font-bold fill-white drop-shadow-md pointer-events-none">
+                    {stats.pct}%
+                  </text>
+                  <text x={zone.cx} y={zone.cy + 8} textAnchor="middle" className="text-[8px] font-medium fill-white drop-shadow-md pointer-events-none opacity-90">
+                    ({stats.makes}/{stats.attempts})
+                  </text>
+                </>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+      <div className="absolute bottom-2 right-2 bg-white/90 p-2 rounded-lg text-[10px] shadow-sm flex items-center gap-2">
+        <div className="flex items-center"><div className="w-3 h-3 bg-red-500 mr-1 rounded-sm"></div>50%+</div>
+        <div className="flex items-center"><div className="w-3 h-3 bg-orange-500 mr-1 rounded-sm"></div>40%+</div>
+        <div className="flex items-center"><div className="w-3 h-3 bg-yellow-500 mr-1 rounded-sm"></div>30%+</div>
+        <div className="flex items-center"><div className="w-3 h-3 bg-blue-500 mr-1 rounded-sm"></div>&lt;30%</div>
+      </div>
+    </div>
+  );
+};
+
+// --- Custom Tooltip ---
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0];
+    return (
+      <div className="bg-white p-3 border border-gray-100 shadow-xl rounded-xl text-xs">
+        <p className="font-bold text-gray-900 mb-2 border-b pb-1">{label}</p>
+        <div className="flex justify-between items-center gap-4">
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: data.color }}></div>
+            <span className="text-gray-600 font-medium">{data.name}:</span>
+          </div>
+          <span className="font-bold font-mono">{data.value}%</span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+// --- Components ---
+
+const LoginForm = ({ onLogin }: { onLogin: () => void }) => (
+  <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+    <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md">
+      <div className="text-center mb-8">
+        <div className="bg-orange-500 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Activity className="text-white w-8 h-8" />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-800">Shot Tracker Pro</h1>
+        <p className="text-gray-500 text-sm mt-2">シューティングの記録と可視化</p>
+      </div>
+      <form onSubmit={(e) => { e.preventDefault(); onLogin(); }} className="space-y-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">ユーザーID</label>
+          <input type="text" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-colors" placeholder="user_id" defaultValue="demo_user" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">パスワード</label>
+          <input type="password" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-colors" placeholder="••••••••" defaultValue="password" />
+        </div>
+        <button type="submit" className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg transition-colors shadow-md">
+          ログイン
+        </button>
+      </form>
+    </div>
+  </div>
+);
+
+// Court Map for Input
+const CourtMapInput = ({ onZoneClick }: { onZoneClick: (zone: ZoneDef) => void }) => {
+  return (
+    <div className="relative w-full max-w-[500px] mx-auto bg-gray-800 rounded-lg overflow-hidden border-4 border-gray-800 shadow-xl">
+      <svg viewBox="0 0 500 500" className="w-full h-auto cursor-default select-none bg-gray-800">
+        <rect x="0" y="0" width="500" height="500" fill="#2d3748" />
+        <rect x="0" y="0" width="500" height="450" fill="#e2d1b3" />
+        <rect x="176.5" y="276" width="147" height="174" fill="none" stroke="#ffffff" strokeWidth="2" />
+        <path d="M 176.5 276 A 54 54 0 0 1 323.5 276" fill="none" stroke="#ffffff" strokeWidth="2" />
+        <path d="M 176.5 276 A 54 54 0 0 0 323.5 276" fill="none" stroke="#ffffff" strokeWidth="2" strokeDasharray="6,6" />
+        <path d="M 52 450 L 52 360.5 A 202.5 202.5 0 0 1 448 360.5 L 448 450" fill="none" stroke="#ffffff" strokeWidth="3" />
+        <rect x="0" y="0" width="500" height="450" fill="none" stroke="#ffffff" strokeWidth="4" />
+        <line x1="250" y1="392.5" x2="250" y2="450" stroke="#ea580c" strokeWidth="4" />
+        <circle cx="250" cy="403" r="13.5" fill="none" stroke="#ea580c" strokeWidth="3" />
+        <rect x="210" y="392.5" width="80" height="2" fill="#ea580c" />
+        <line x1="214" y1="414" x2="286" y2="414" stroke="#334155" strokeWidth="2" />
+
+        {COURT_ZONES.map((zone) => (
+          <g key={zone.id} onClick={(e) => { e.stopPropagation(); onZoneClick(zone); }} className="group cursor-pointer">
+            <path d={zone.path} className={`fill-transparent stroke-orange-900/10 stroke-1 transition-all duration-150 hover:fill-orange-500/40 active:fill-orange-600/60`} />
+            <text x={zone.cx} y={zone.cy} textAnchor="middle" dominantBaseline="middle" className="text-[10px] sm:text-xs fill-gray-700 font-sans font-bold pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md bg-white/50">
+              {zone.label}
+            </text>
+          </g>
+        ))}
+        <line x1="0" y1="450" x2="500" y2="450" stroke="#1f2937" strokeWidth="4" />
+      </svg>
+      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 text-xs font-bold text-gray-500/80 pointer-events-none">
+        TAP TO RECORD
+      </div>
+    </div>
+  );
+};
+
+// Input Modal
+const InputModal = ({ zone, onClose, onSave }: { zone: ZoneDef, onClose: () => void, onSave: (m: number, a: number) => void }) => {
+  const [attempts, setAttempts] = useState(10);
+  const [makes, setMakes] = useState(5);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(makes, attempts);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-200 backdrop-blur-sm">
+      <div className="bg-white w-full max-w-sm rounded-t-2xl sm:rounded-2xl p-6 shadow-2xl animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200">
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <span className="block text-xs font-bold text-orange-600 uppercase tracking-wider mb-1">{zone.category} Area</span>
+            <h3 className="text-xl font-extrabold text-gray-900">{zone.label}</h3>
+          </div>
+          <button onClick={onClose} className="p-1 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
+            <XCircle className="w-6 h-6 text-gray-500" />
+          </button>
+        </div>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center bg-gray-50 p-5 rounded-xl border border-gray-100">
+            <div className="text-center flex-1">
+              <label className="block text-xs text-gray-500 font-bold uppercase tracking-wide mb-2">試投数 (Attempts)</label>
+              <div className="flex items-center justify-center space-x-4">
+                <button onClick={() => setAttempts(Math.max(1, attempts - 1))} className="w-10 h-10 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors text-lg font-bold">-</button>
+                <span className="text-3xl font-extrabold w-12 text-center text-gray-800">{attempts}</span>
+                <button onClick={() => setAttempts(attempts + 1)} className="w-10 h-10 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors text-lg font-bold">+</button>
+              </div>
+            </div>
+            <div className="text-center flex-1 border-l border-gray-200 pl-6">
+              <label className="block text-xs text-gray-500 font-bold uppercase tracking-wide mb-2">成功数 (Makes)</label>
+               <div className="flex items-center justify-center space-x-4">
+                <button onClick={() => setMakes(Math.max(0, makes - 1))} className="w-10 h-10 rounded-full bg-white border border-green-200 shadow-sm flex items-center justify-center text-green-600 hover:bg-green-50 active:bg-green-100 transition-colors text-lg font-bold">-</button>
+                <span className="text-3xl font-extrabold w-12 text-center text-green-600">{makes}</span>
+                <button onClick={() => setMakes(Math.min(attempts, makes + 1))} className="w-10 h-10 rounded-full bg-white border border-green-200 shadow-sm flex items-center justify-center text-green-600 hover:bg-green-50 active:bg-green-100 transition-colors text-lg font-bold">+</button>
+              </div>
+            </div>
+          </div>
+          <div className="bg-blue-50 p-4 rounded-xl flex justify-between items-center border border-blue-100">
+            <span className="text-sm text-blue-800 font-bold">今回の確率</span>
+            <span className="text-2xl font-extrabold text-blue-600">{Math.round((makes / attempts) * 100)}<span className="text-lg">%</span></span>
+          </div>
+          <button onClick={handleSubmit} className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-4 rounded-xl flex items-center justify-center space-x-2 shadow-md transition-transform active:scale-[0.99]">
+            <CheckCircle className="w-6 h-6" />
+            <span className="text-lg">記録を保存</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Main App Component ---
+
+export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentTab, setCurrentTab] = useState<'input' | 'analysis'>('input');
+  // ★重要: 初期値を空配列にし、データはAPIから取得する
+  const [data, setData] = useState<ShotRecord[]>([]); 
+  const [selectedZone, setSelectedZone] = useState<ZoneDef | null>(null);
+  const [filterPeriod, setFilterPeriod] = useState<'1month' | '1year' | 'all'>('1month');
+  const [filterCategory, setFilterCategory] = useState<ZoneCategory | 'Total'>('Total');
+
+  const handleLogin = () => setIsLoggedIn(true);
+  const handleZoneClick = (zone: ZoneDef) => setSelectedZone(zone);
+
+  // ★API: データ取得 (初回ロード時)
+  useEffect(() => {
+    if (isLoggedIn) {
+      axios.get('/api/shots')
+        .then(response => {
+          setData(response.data);
+        })
+        .catch(error => {
+          console.error("Error fetching data:", error);
+          // エラー時はフォールバックとして空配列などをセットしても良い
+        });
+    }
+  }, [isLoggedIn]);
+
+  // ★API: データ保存
+  const handleSaveRecord = (makes: number, attempts: number) => {
+    if (!selectedZone) return;
+    
+    const newRecord = {
+      date: new Date().toISOString().split('T')[0],
+      zoneId: selectedZone.id,
+      category: selectedZone.category,
+      makes,
+      attempts
+    };
+
+    axios.post('/api/shots', newRecord)
+      .then(response => {
+        // 保存成功したら、リストに追加（サーバーから返ってきたID付きのデータを使う）
+        setData(prev => [...prev, response.data]);
+        setSelectedZone(null);
+      })
+      .catch(error => {
+        console.error("Error saving data:", error);
+        alert("保存に失敗しました");
+      });
+  };
+
+  // --- Logic for "Recent 7 Sessions" Chart ---
+  const recentSessionsData = useMemo(() => {
+    const grouped = data.reduce((acc, curr) => {
+      if (!acc[curr.date]) acc[curr.date] = { date: curr.date, makes: 0, attempts: 0 };
+      acc[curr.date].makes += curr.makes;
+      acc[curr.date].attempts += curr.attempts;
+      return acc;
+    }, {} as Record<string, { date: string, makes: number, attempts: number }>);
+    
+    return Object.values(grouped)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .slice(-7)
+      .map(d => ({
+        ...d,
+        pct: d.attempts > 0 ? Math.round((d.makes / d.attempts) * 100) : 0
+      }));
+  }, [data]);
+
+  const recentSessionsStats = useMemo(() => {
+    const totalAttempts = recentSessionsData.reduce((acc, curr) => acc + curr.attempts, 0);
+    const totalMakes = recentSessionsData.reduce((acc, curr) => acc + curr.makes, 0);
+    const avgPct = totalAttempts > 0 ? Math.round((totalMakes / totalAttempts) * 100) : 0;
+    return { totalAttempts, totalMakes, avgPct };
+  }, [recentSessionsData]);
+
+
+  // --- Logic for Analysis Chart ---
+  const analysisTrendData = useMemo(() => {
+    let filtered = data;
+    
+    const today = new Date();
+    if (filterPeriod === '1month') {
+      const d = new Date(); d.setDate(today.getDate() - 30);
+      filtered = filtered.filter(x => new Date(x.date) >= d);
+    } else if (filterPeriod === '1year') {
+      const d = new Date(); d.setDate(today.getDate() - 365);
+      filtered = filtered.filter(x => new Date(x.date) >= d);
+    }
+
+    const grouped = filtered.reduce((acc, curr) => {
+      const date = curr.date;
+      if (!acc[date]) {
+        acc[date] = { date, totalM: 0, totalA: 0, paintM: 0, paintA: 0, midM: 0, midA: 0, p3M: 0, p3A: 0 };
+      }
+      const rec = acc[date];
+      rec.totalM += curr.makes; rec.totalA += curr.attempts;
+      if (curr.category === 'Paint') { rec.paintM += curr.makes; rec.paintA += curr.attempts; }
+      if (curr.category === 'Mid') { rec.midM += curr.makes; rec.midA += curr.attempts; }
+      if (curr.category === '3PT') { rec.p3M += curr.makes; rec.p3A += curr.attempts; }
+      return acc;
+    }, {} as any);
+
+    return Object.values(grouped).sort((a:any, b:any) => new Date(a.date).getTime() - new Date(b.date).getTime()).map((d: any) => ({
+      date: d.date,
+      Total: d.totalA > 0 ? Math.round((d.totalM/d.totalA)*100) : null,
+      Paint: d.paintA > 0 ? Math.round((d.paintM/d.paintA)*100) : null,
+      Mid: d.midA > 0 ? Math.round((d.midM/d.midA)*100) : null,
+      '3PT': d.p3A > 0 ? Math.round((d.p3M/d.p3A)*100) : null,
+    }));
+  }, [data, filterPeriod]);
+
+  const heatmapData = useMemo(() => {
+    const today = new Date();
+    let start = new Date(0);
+    if (filterPeriod === '1month') start = new Date(today.setDate(today.getDate() - 30));
+    if (filterPeriod === '1year') start = new Date(today.setDate(today.getDate() - 365));
+    return data.filter(d => new Date(d.date) >= start);
+  }, [data, filterPeriod]);
+
+
+  if (!isLoggedIn) return <LoginForm onLogin={handleLogin} />;
+
+  return (
+    <div className="min-h-screen bg-gray-100 pb-20 sm:pb-0 font-sans text-gray-900">
+      
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10 px-4 py-3 flex justify-between items-center shadow-sm">
+        <div className="flex items-center space-x-2">
+          <div className="bg-orange-500 p-1.5 rounded-lg shadow-sm">
+            <Activity className="text-white w-5 h-5" />
+          </div>
+          <span className="font-extrabold text-xl tracking-tight text-gray-800">ShotTracker <span className="text-orange-500">Pro</span></span>
+        </div>
+        <button onClick={() => setIsLoggedIn(false)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors">
+          <LogOut className="w-5 h-5" />
+        </button>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="max-w-3xl mx-auto p-4 sm:p-6 space-y-6">
+        
+        {/* Tab Switcher */}
+        <div className="flex p-1.5 bg-white rounded-xl shadow-sm border border-gray-100">
+          <button 
+            onClick={() => setCurrentTab('input')}
+            className={`flex-1 flex items-center justify-center space-x-2 py-2.5 rounded-lg text-sm font-bold transition-all ${currentTab === 'input' ? 'bg-orange-50 text-orange-700 shadow-sm ring-1 ring-orange-100' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
+          >
+            <MapPin className={`w-4 h-4 ${currentTab === 'input' ? 'text-orange-500' : ''}`} />
+            <span>記録 (Input)</span>
+          </button>
+          <button 
+             onClick={() => setCurrentTab('analysis')}
+             className={`flex-1 flex items-center justify-center space-x-2 py-2.5 rounded-lg text-sm font-bold transition-all ${currentTab === 'analysis' ? 'bg-orange-50 text-orange-700 shadow-sm ring-1 ring-orange-100' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
+          >
+            <BarChart2 className={`w-4 h-4 ${currentTab === 'analysis' ? 'text-orange-500' : ''}`} />
+            <span>分析 (Analysis)</span>
+          </button>
+        </div>
+
+        {/* --- VIEW: INPUT MODE --- */}
+        {currentTab === 'input' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            {/* Court Card */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-2 sm:p-6 overflow-hidden">
+              <div className="mb-4 text-center">
+                 <h2 className="text-lg font-extrabold text-gray-800">シュートエリアを選択</h2>
+                 <p className="text-xs text-gray-500">コート上の記録したい場所をタップしてください</p>
+              </div>
+              <CourtMapInput onZoneClick={handleZoneClick} />
+            </div>
+
+            {/* Recent 7 Sessions Stats Card */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-5 sm:p-6">
+               <div className="flex justify-between items-start mb-6">
+                 <div>
+                   <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide">直近7回の全体確率</h3>
+                   <div className="flex items-baseline space-x-3 mt-1">
+                     <span className="text-4xl font-extrabold text-gray-900">{recentSessionsStats.avgPct}<span className="text-2xl">%</span></span>
+                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-green-100 text-green-700">
+                       Last 7 Sessions
+                     </span>
+                   </div>
+                 </div>
+                 <div className="text-right bg-orange-50 p-3 rounded-xl border border-orange-100">
+                   <div className="text-xs text-orange-800 font-bold mb-1">成功数 / 総試投数</div>
+                   <div className="text-xl font-extrabold text-gray-800">
+                     <span className="text-orange-600">{recentSessionsStats.totalMakes.toLocaleString()}</span>
+                     <span className="text-sm text-gray-400 mx-1">/</span>
+                     {recentSessionsStats.totalAttempts.toLocaleString()} 
+                   </div>
+                 </div>
+               </div>
+               
+               <div className="h-64 w-full">
+                 <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={recentSessionsData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
+                      <defs>
+                        <linearGradient id="colorPctInput" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#ea580c" stopOpacity={0.2}/>
+                          <stop offset="95%" stopColor="#ea580c" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="date" 
+                        tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 500 }} 
+                        tickFormatter={(val) => val.slice(5).replace('-', '/')} 
+                        interval="preserveStartEnd"
+                        axisLine={false}
+                        tickLine={false}
+                        dy={10}
+                      />
+                      <YAxis 
+                        domain={[0, 100]} 
+                        tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 500 }}
+                        tickFormatter={(val) => `${val}%`}
+                        axisLine={false}
+                        tickLine={false}
+                        dx={-5}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Line 
+                        type="monotone" 
+                        dataKey="pct" 
+                        stroke="#ea580c" 
+                        strokeWidth={3} 
+                        dot={{ r: 4, fill: '#fff', stroke: '#ea580c', strokeWidth: 2 }} 
+                        activeDot={{ r: 6, fill: '#ea580c', stroke: '#fff', strokeWidth: 2 }} 
+                        fill="url(#colorPctInput)" 
+                      />
+                    </LineChart>
+                 </ResponsiveContainer>
+               </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- VIEW: ANALYSIS MODE --- */}
+        {currentTab === 'analysis' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+            {/* Filters */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200/50">
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5">
+                <div className="flex-1">
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1"><Filter className="w-3 h-3"/>カテゴリーフィルター (グラフ表示)</label>
+                  <div className="flex flex-wrap gap-2">
+                    {(['Total', 'Paint', 'Mid', '3PT'] as const).map(cat => (
+                      <button 
+                        key={cat}
+                        onClick={() => setFilterCategory(cat)}
+                        className={`px-4 py-2 text-xs font-bold rounded-full transition-all shadow-sm ${filterCategory === cat ? 'bg-gray-900 text-white ring-2 ring-gray-900 ring-offset-2' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'}`}
+                      >
+                        {cat === 'Total' ? 'Total (全体)' : cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">期間</label>
+                  <select 
+                    value={filterPeriod}
+                    onChange={(e) => setFilterPeriod(e.target.value as any)}
+                    className="bg-white border border-gray-200 text-gray-700 font-bold text-sm rounded-xl focus:ring-orange-500 focus:border-orange-500 block w-full pl-4 pr-10 py-2.5 shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27 stroke=%27%236b7280%27%3E%3Cpath stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:1.5em_1.5em] bg-no-repeat bg-[right_0.5rem_center]"
+                  >
+                    <option value="1month">直近 1ヶ月</option>
+                    <option value="1year">直近 1年</option>
+                    <option value="all">全期間</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Main Chart */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200/50">
+               <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-lg font-extrabold text-gray-800">シュート確率推移</h3>
+                  <span className="text-xs font-bold px-3 py-1 bg-gray-100 text-gray-600 rounded-full">
+                    {filterCategory === 'Total' ? '全体' : filterCategory}の確率
+                  </span>
+               </div>
+               <div className="h-80 w-full">
+                 <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={analysisTrendData} margin={{ top: 10, right: 10, bottom: 0, left: -15 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={true} horizontal={true} stroke="#e5e7eb" />
+                      <XAxis 
+                        dataKey="date" 
+                        tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 500 }} 
+                        tickFormatter={(val) => val.slice(5).replace('-', '/')} 
+                        interval="preserveStartEnd"
+                        axisLine={false}
+                        tickLine={false}
+                        dy={10}
+                      />
+                      <YAxis 
+                        domain={[0, 100]} 
+                        tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 500 }}
+                        tickFormatter={(val) => `${val}%`}
+                        axisLine={false}
+                        tickLine={false}
+                        dx={-10}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      
+                      {filterCategory === 'Total' && (
+                        <Line type="monotone" dataKey="Total" stroke="#374151" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} name="全体" />
+                      )}
+                      {filterCategory === 'Paint' && (
+                        <Line type="monotone" dataKey="Paint" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} name="Paint" />
+                      )}
+                      {filterCategory === 'Mid' && (
+                        <Line type="monotone" dataKey="Mid" stroke="#f97316" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} name="Mid" />
+                      )}
+                      {filterCategory === '3PT' && (
+                        <Line type="monotone" dataKey="3PT" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} name="3PT" />
+                      )}
+
+                    </LineChart>
+                 </ResponsiveContainer>
+               </div>
+            </div>
+
+            {/* Heatmap Section */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-extrabold text-gray-800">エリア別ヒートマップ</h3>
+                <span className="text-xs font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                  {filterPeriod === '1month' ? '直近 1ヶ月' : filterPeriod === '1year' ? '直近 1年' : '全期間'}
+                </span>
+              </div>
+              <HeatmapCourt data={heatmapData} />
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Input Modal */}
+      {selectedZone && (
+        <InputModal 
+          zone={selectedZone} 
+          onClose={() => setSelectedZone(null)} 
+          onSave={handleSaveRecord} 
+        />
+      )}
+    </div>
+  );
+}

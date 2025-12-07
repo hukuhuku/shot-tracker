@@ -1,0 +1,40 @@
+--- OS / IDE ---
+
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/
+*.log
+
+--- Backend (Java / Spring Boot) ---
+
+backend/target/
+backend/out/
+backend/*.log
+backend/.mvn/wrapper/maven-wrapper.properties
+backend/mvnw
+backend/mvnw.cmd
+backend/help.md
+
+環境変数ファイル（DBパスワードなどが含まれるためGitに上げない）
+
+backend/src/main/resources/application-local.properties
+backend/.env
+
+--- Frontend (Node.js / React / Vue) ---
+
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.env
+frontend/.env.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/coverage/
+
+--- Docker ---
+
+docker-compose.override.yml
