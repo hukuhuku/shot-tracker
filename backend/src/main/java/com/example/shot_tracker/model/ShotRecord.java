@@ -35,4 +35,15 @@ public class ShotRecord {
 
     // 試投数
     private int attempts;
+
+    public ShotRecord() {}
+
+    public ShotRecord(String userId, String zoneId, String category,int makes, int attempts, LocalDate date) {
+        this.userId = userId;
+        this.zoneId = zoneId;
+        this.category = category;
+        this.makes = makes;
+        this.attempts = attempts;
+        this.date = date;
+    }
 }
