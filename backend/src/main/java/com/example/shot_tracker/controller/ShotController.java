@@ -12,7 +12,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/shots")
-@CrossOrigin(origins="http://localhost:5173")
+@CrossOrigin(origins="*")
 public class ShotController {
 
     @Autowired
