@@ -1,11 +1,16 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+// 未使用のUser, Lockを削除
 import { Activity, BarChart2, MapPin, CheckCircle, XCircle, LogOut, Filter, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import axios from 'axios';
 
+// ★追加: Firebase関連のインポート (相対パスが正しいことを確認)
+import { auth, googleProvider } from './firebaseConfig';
+import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+
 // --- Types & Constants ---
 
-// ★修正: バックエンドのURLを定数で定義 (末尾スラッシュなし)
+// バックエンドURL (末尾スラッシュなし)
 const API_BASE_URL = "https://shot-tracker-production.up.railway.app";
 
 type ZoneCategory = 'Paint' | 'Mid' | '3PT';
@@ -125,39 +130,45 @@ const HeatmapCourt = ({ data }: { data: ShotRecord[] }) => {
   );
 };
 
-const LoginForm = ({ onLogin }: { onLogin: (userId: string) => void }) => {
-  const [inputUserId, setInputUserId] = useState('');
-  
+// ログインフォーム (Googleログイン)
+const LoginForm = ({ onLogin }: { onLogin: () => void }) => {
+  const handleGoogleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+      onLogin(); // 親コンポーネントへ通知（実際のUserセットはonAuthStateChangedで行う）
+    } catch (error) {
+      console.error("Login failed:", error);
+      alert("ログインに失敗しました");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="bg-orange-500 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Activity className="text-white w-8 h-8" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800">Shot Tracker Pro</h1>
+      <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md text-center">
+        <div className="bg-orange-500 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Activity className="text-white w-8 h-8" />
         </div>
-        <form onSubmit={(e) => { e.preventDefault(); onLogin(inputUserId || 'demo_user'); }} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ユーザーID</label>
-            <input 
-              type="text" 
-              value={inputUserId}
-              onChange={(e) => setInputUserId(e.target.value)}
-              className="w-full pl-4 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" 
-              placeholder="user_idを入力" 
-            />
-          </div>
-          <button type="submit" className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg transition-colors shadow-md">
-            ログイン
-          </button>
-        </form>
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">Shot Tracker Pro</h1>
+        <p className="text-gray-500 text-sm mb-8">日々のシュート練習を記録・分析</p>
+        
+        <button 
+          onClick={handleGoogleLogin}
+          className="w-full bg-white border border-gray-300 text-gray-700 font-bold py-3 rounded-lg hover:bg-gray-50 transition-colors shadow-sm flex items-center justify-center gap-3"
+        >
+          {/* Google Icon (簡易版) */}
+          <svg className="w-5 h-5" viewBox="0 0 24 24">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          Googleでログイン
+        </button>
       </div>
     </div>
   );
 };
 
-// Court Map for Input (Revised Labels & Stats & Color)
 const CourtMapInput = ({ onZoneClick, dailyRecords }: { onZoneClick: (zone: ZoneDef) => void, dailyRecords: ShotRecord[] }) => {
   return (
     <div className="relative w-full max-w-[500px] mx-auto bg-gray-800 rounded-lg overflow-hidden border-4 border-gray-800 shadow-xl">
@@ -183,11 +194,9 @@ const CourtMapInput = ({ onZoneClick, dailyRecords }: { onZoneClick: (zone: Zone
             <g key={zone.id} onClick={(e) => { e.stopPropagation(); onZoneClick(zone); }} className="group cursor-pointer">
               <path 
                 d={zone.path} 
-                // 入力済みならうっすら赤く(fill-red-500/20)、そうでなければ透明(fill-transparent)
                 className={`stroke-orange-900/10 stroke-1 transition-all duration-150 hover:fill-orange-500/40 active:fill-orange-600/60 ${hasRecord ? 'fill-red-500/20' : 'fill-transparent'}`} 
               />
               
-              {/* ラベル: 常時表示。記録がある場合は上にずらす */}
               <text 
                 x={zone.cx} 
                 y={zone.cy - (hasRecord ? 8 : 0)} 
@@ -206,7 +215,6 @@ const CourtMapInput = ({ onZoneClick, dailyRecords }: { onZoneClick: (zone: Zone
                 ))}
               </text>
               
-              {/* 数値: 記録がある場合のみ、ラベルの下にグレーアウトで表示 */}
               {hasRecord && record && (
                 <text 
                   x={zone.cx} 
@@ -243,7 +251,6 @@ const InputModal = ({ zone, initialMakes = 0, initialAttempts = 0, onClose, onSa
         <div className="flex justify-between items-start mb-6">
           <div>
             <span className="block text-xs font-bold text-orange-600 uppercase tracking-wider mb-1">{zone.category} Area</span>
-            {/* 改行コードをスペースに置換して表示 */}
             <h3 className="text-xl font-extrabold text-gray-900">{zone.label.replace('\n', ' ')}</h3>
             {initialAttempts > 0 && <span className="inline-block mt-1 text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-bold">編集中</span>}
           </div>
@@ -280,7 +287,7 @@ const InputModal = ({ zone, initialMakes = 0, initialAttempts = 0, onClose, onSa
 // --- Main App Component ---
 
 export default function App() {
-  const [userId, setUserId] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null); // ★修正: FirebaseのUserオブジェクトを使用
   const [currentTab, setCurrentTab] = useState<'input' | 'analysis'>('input');
   const [data, setData] = useState<ShotRecord[]>([]); 
   const [selectedZone, setSelectedZone] = useState<ZoneDef | null>(null);
@@ -289,8 +296,15 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isDemoMode, setIsDemoMode] = useState(false);
 
-  const handleLogin = (id: string) => setUserId(id);
   const handleZoneClick = (zone: ZoneDef) => setSelectedZone(zone);
+
+  // ★追加: 認証状態の監視
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const changeDate = (days: number) => {
     const newDate = new Date(selectedDate);
@@ -308,9 +322,9 @@ export default function App() {
   }, [data, selectedDate]);
 
   useEffect(() => {
-    if (userId) {
-      // ★修正: API_BASE_URLを使って完全なURLを指定
-      axios.get(`${API_BASE_URL}/api/shots?userId=${userId}`)
+    if (currentUser) {
+      // ★修正: currentUser.uid を使ってデータを取得
+      axios.get(`${API_BASE_URL}/api/shots?userId=${currentUser.uid}`)
         .then(response => {
           console.log("Connected to backend!");
           setData(response.data);
@@ -322,14 +336,14 @@ export default function App() {
           setIsDemoMode(true);
         });
     }
-  }, [userId]);
+  }, [currentUser]);
 
   const handleSaveRecord = (makes: number, attempts: number) => {
-    if (!selectedZone || !userId) return;
+    if (!selectedZone || !currentUser) return;
     
     const queryDate = formatDateQuery(selectedDate);
     const newRecord = {
-      userId: userId,
+      userId: currentUser.uid, // ★修正: FirebaseのUIDを使用
       date: queryDate,
       zoneId: selectedZone.id,
       category: selectedZone.category,
@@ -344,7 +358,6 @@ export default function App() {
       });
       setSelectedZone(null);
     } else {
-      // ★修正: API_BASE_URLを使って完全なURLを指定
       axios.post(`${API_BASE_URL}/api/shots`, newRecord)
         .then(response => {
           const savedData = response.data;
@@ -415,7 +428,7 @@ export default function App() {
     return dailyRecords.find(r => r.zoneId === selectedZone.id) || null;
   }, [selectedZone, dailyRecords]);
 
-  if (!userId) return <LoginForm onLogin={handleLogin} />;
+  if (!currentUser) return <LoginForm onLogin={() => {}} />;
 
   return (
     <div className="min-h-screen bg-gray-100 pb-20 sm:pb-0 font-sans text-gray-900">
@@ -425,7 +438,7 @@ export default function App() {
           <span className="font-extrabold text-xl tracking-tight text-gray-800">ShotTracker <span className="text-orange-500">Pro</span></span>
           {isDemoMode && <span className="text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-bold">DEMO</span>}
         </div>
-        <button onClick={() => setUserId(null)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"><LogOut className="w-5 h-5" /></button>
+        <button onClick={() => signOut(auth)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"><LogOut className="w-5 h-5" /></button>
       </header>
 
       <main className="max-w-3xl mx-auto p-4 sm:p-6 space-y-6">
