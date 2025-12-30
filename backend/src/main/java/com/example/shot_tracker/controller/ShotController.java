@@ -5,7 +5,9 @@ import com.example.shot_tracker.repository.ShotRepository;
 import com.example.shot_tracker.service.AuthService; 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -15,7 +17,6 @@ import java.util.Optional;
 @RequestMapping("/api/shots")
 @CrossOrigin(origins="*")
 public class ShotController {
-
     @Autowired
     private ShotRepository shotRepository;
 
@@ -26,25 +27,23 @@ public class ShotController {
     public List<ShotRecord> getRecords(
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @RequestHeader("Authorization") String authHeader {
-
+            @RequestHeader("Authorization") String authHeader){
         try{
             //トークンを検証してUIDを取得(なりすまし防止)
             String currentUserId = authService.verifyTokenAndGetUserId(authHeader);
 
             //dateがnullの場合は当日の日付を入れる
             if (date == null) date = LocalDate.now();
-            return shotRepository.findByUserIdAndDate(currentUserId,date)
+            return shotRepository.findByUserIdAndDate(currentUserId,date);
            
         }catch (Exception e){
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid Token");
         }
     }
-
     @PostMapping
     public ShotRecord createOrUpdateRecords(
             @RequestHeader("Authorization") String authHeader,
-            @RequestBody ShotRecord requestRecord) {
+            @RequestBody ShotRecord requestRecord){
         
         try{
             //認証情報からuserIDを取得
