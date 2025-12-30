@@ -1,10 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-// 修正1: 使っていない User, Lock を削除
-import { Activity, BarChart2, MapPin, CheckCircle, XCircle, LogOut, Filter, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Activity, BarChart2, MapPin, CheckCircle, XCircle, LogOut, Filter, User, Lock, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import axios from 'axios';
 
 // --- Types & Constants ---
+
+// ★修正: バックエンドのURLを定数で定義 (末尾スラッシュなし)
+const API_BASE_URL = "https://shot-tracker-production.up.railway.app";
 
 type ZoneCategory = 'Paint' | 'Mid' | '3PT';
 
@@ -39,6 +41,7 @@ const COURT_ZONES: ZoneDef[] = [
   { id: 'Mid-R-Wing', label: 'Mid R-Wing', category: 'Mid', group: 'Wing', path: 'M 448 360.5 L 323.5 360.5 L 323.5 214.3 A 202.5 202.5 0 0 1 448 360.5 Z', cx: 375, cy: 280 },
   { id: 'Mid-R-Corner', label: 'Mid R-Crnr', category: 'Mid', group: 'Corner', path: 'M 448 450 L 323.5 450 L 323.5 360.5 L 448 360.5 Z', cx: 386, cy: 405 },
   // --- 3 Point Areas ---
+  // 改行したい場所に \n を入れています
   { id: '3PT-L-Corner', label: '3PT\nL-Crnr', category: '3PT', group: 'Corner', path: 'M 0 450 L 52 450 L 52 360.5 L 0 360.5 Z', cx: 26, cy: 405 },
   { id: '3PT-L-Wing', label: '3PT L-Wing', category: '3PT', group: 'Wing', path: 'M 52 360.5 A 202.5 202.5 0 0 1 176.5 214.3 L 176.5 0 L 0 0 L 0 360.5 Z', cx: 60, cy: 150 },
   { id: '3PT-Top', label: '3PT Top', category: '3PT', group: 'Top', path: 'M 176.5 214.3 A 202.5 202.5 0 0 1 323.5 214.3 L 323.5 0 L 176.5 0 Z', cx: 250, cy: 80 },
@@ -101,8 +104,6 @@ const HeatmapCourt = ({ data }: { data: ShotRecord[] }) => {
           const stats = zoneStats[zone.id] || { pct: 0, makes: 0, attempts: 0 };
           const color = getColor(stats.pct, stats.attempts);
           
-          // 修正2: HeatmapCourtではラベル表示ロジックは使わないので labelLines 定義を削除しました
-
           return (
             <g key={zone.id} className="group">
               <path d={zone.path} fill={color} stroke="white" strokeWidth="2" className="transition-colors duration-300 opacity-80 hover:opacity-100" />
@@ -182,9 +183,11 @@ const CourtMapInput = ({ onZoneClick, dailyRecords }: { onZoneClick: (zone: Zone
             <g key={zone.id} onClick={(e) => { e.stopPropagation(); onZoneClick(zone); }} className="group cursor-pointer">
               <path 
                 d={zone.path} 
+                // 入力済みならうっすら赤く(fill-red-500/20)、そうでなければ透明(fill-transparent)
                 className={`stroke-orange-900/10 stroke-1 transition-all duration-150 hover:fill-orange-500/40 active:fill-orange-600/60 ${hasRecord ? 'fill-red-500/20' : 'fill-transparent'}`} 
               />
               
+              {/* ラベル: 常時表示。記録がある場合は上にずらす */}
               <text 
                 x={zone.cx} 
                 y={zone.cy - (hasRecord ? 8 : 0)} 
@@ -203,6 +206,7 @@ const CourtMapInput = ({ onZoneClick, dailyRecords }: { onZoneClick: (zone: Zone
                 ))}
               </text>
               
+              {/* 数値: 記録がある場合のみ、ラベルの下にグレーアウトで表示 */}
               {hasRecord && record && (
                 <text 
                   x={zone.cx} 
@@ -239,6 +243,7 @@ const InputModal = ({ zone, initialMakes = 0, initialAttempts = 0, onClose, onSa
         <div className="flex justify-between items-start mb-6">
           <div>
             <span className="block text-xs font-bold text-orange-600 uppercase tracking-wider mb-1">{zone.category} Area</span>
+            {/* 改行コードをスペースに置換して表示 */}
             <h3 className="text-xl font-extrabold text-gray-900">{zone.label.replace('\n', ' ')}</h3>
             {initialAttempts > 0 && <span className="inline-block mt-1 text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-bold">編集中</span>}
           </div>
@@ -304,7 +309,8 @@ export default function App() {
 
   useEffect(() => {
     if (userId) {
-      axios.get(`/api/shots?userId=${userId}`)
+      // ★修正: API_BASE_URLを使って完全なURLを指定
+      axios.get(`${API_BASE_URL}/api/shots?userId=${userId}`)
         .then(response => {
           console.log("Connected to backend!");
           setData(response.data);
@@ -338,7 +344,8 @@ export default function App() {
       });
       setSelectedZone(null);
     } else {
-      axios.post('/api/shots', newRecord)
+      // ★修正: API_BASE_URLを使って完全なURLを指定
+      axios.post(`${API_BASE_URL}/api/shots`, newRecord)
         .then(response => {
           const savedData = response.data;
           setData(prev => {
@@ -458,7 +465,7 @@ export default function App() {
                    <div className="text-xl font-extrabold text-gray-800"><span className="text-orange-600">{recentSessionsStats.totalMakes}</span><span className="text-sm text-gray-400 mx-1">/</span>{recentSessionsStats.totalAttempts}</div>
                  </div>
                </div>
-               <div className="h-64 w-full">
+               <div className="h-64 w-full min-h-[300px]">
                  <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={recentSessionsData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -497,7 +504,7 @@ export default function App() {
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200/50">
                <h3 className="text-lg font-extrabold text-gray-800 mb-6">シュート確率推移</h3>
-               <div className="h-80 w-full">
+               <div className="h-80 w-full min-h-[300px]">
                  <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={analysisTrendData} margin={{ top: 10, right: 10, bottom: 0, left: -15 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={true} horizontal={true} stroke="#e5e7eb" />
