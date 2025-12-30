@@ -55,31 +55,7 @@ const COURT_ZONES: ZoneDef[] = [
   { id: '3PT-R-Corner', label: '3PT\nR-Crnr', category: '3PT', group: 'Corner', path: 'M 500 450 L 448 450 L 448 360.5 L 500 360.5 Z', cx: 474, cy: 405 },
 ];
 
-// --- Mock Data Generator ---
-const generateMockData = (): ShotRecord[] => {
-  const data: ShotRecord[] = [];
-  const today = new Date();
-  for (let i = 0; i < 60; i++) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split('T')[0];
-    if (Math.random() > 0.4) {
-      COURT_ZONES.forEach(zone => {
-        if (Math.random() > 0.6) {
-          const attempts = Math.floor(Math.random() * 15) + 5;
-          let percentage = zone.category === 'Paint' ? 0.75 : zone.category === 'Mid' ? 0.55 : 0.38;
-          percentage += (Math.random() * 0.3 - 0.15); 
-          const makes = Math.floor(attempts * Math.max(0, Math.min(1, percentage)));
-          data.push({ id: Math.random(), userId: 'demo', date: dateStr, zoneId: zone.id, category: zone.category, makes, attempts });
-        }
-      });
-    }
-  }
-  return data;
-};
-
 // --- Sub Components ---
-
 const HeatmapCourt = ({ data }: { data: ShotRecord[] }) => {
   const zoneStats = useMemo(() => {
     return COURT_ZONES.reduce((acc, zone) => {
@@ -286,7 +262,6 @@ const InputModal = ({ zone, initialMakes = 0, initialAttempts = 0, onClose, onSa
 };
 
 // --- Main App Component ---
-
 export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null); // ★修正: FirebaseのUserオブジェクトを使用
   const [currentTab, setCurrentTab] = useState<'input' | 'analysis'>('input');
@@ -331,11 +306,6 @@ export default function App() {
           console.log("Connected to backend!");
           setData(response.data);
           setIsDemoMode(false);
-        })
-        .catch(error => {
-          console.log("Backend not reachable. Using Mock Data.", error);
-          setData(generateMockData());
-          setIsDemoMode(true);
         });
     }
   }, [currentUser]);
