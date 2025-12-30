@@ -47,13 +47,25 @@ export default function App() {
   // データ取得
   useEffect(() => {
     if (currentUser) {
-      axios.get(`${API_BASE_URL}/api/shots?userId=${currentUser.uid}`)
-        .then(response => {
-          console.log("Connected to backend!");
+      const fetchData = async () => {
+        try{
+          //1.トークンの取得
+          const token = await currentUser.getIdToken();
+
+          //2.ヘッダーに付与してリクエスト
+          const response = await axios.get(`${API_BASE_URL}/api/shots`,{
+            headers:{
+              Authorization: `Bearer ${token}` // "Bearer " の後ろにトークン
+            }
+          });
+
+          console.log("Connected to backend");
           setData(response.data);
-          // ★削除: setIsDemoMode(false);
-        })
-        .catch(err => console.error(err));
+        }catch (error){
+          console.log("Backend not reachable or Auth failed.",error);
+        }
+      };
+      fetchData();
     }
   }, [currentUser]);
 
@@ -62,11 +74,11 @@ export default function App() {
   // ==========================================
 
   // 日付操作
-  const changeDate = (days: number) => {
+  function changeDate(days: number) {
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() + days);
     setSelectedDate(newDate);
-  };
+  }
 
   const formatDateQuery = (date: Date) => {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -79,7 +91,7 @@ export default function App() {
   }, [data, selectedDate]);
 
   // 記録保存処理
-  const handleSaveRecord = (makes: number, attempts: number) => {
+  const handleSaveRecord = async (makes: number, attempts: number) => {
     if (!selectedZone || !currentUser) return;
     
     const queryDate = formatDateQuery(selectedDate);
@@ -92,22 +104,31 @@ export default function App() {
       attempts
     };
 
-    // ★修正: DemoModeの条件分岐を削除し、直接バックエンドへ保存するように変更
-    axios.post(`${API_BASE_URL}/api/shots`, newRecord)
-      .then(response => {
-        const savedData = response.data;
-        setData(prev => {
-          // 既存の同日・同ゾーンのデータがあれば除外して、新しいデータを追加
-          const filtered = prev.filter(r => !(r.date === queryDate && r.zoneId === selectedZone.id));
-          return [...filtered, savedData];
-        });
-        setSelectedZone(null);
-      })
-      .catch(error => {
-        console.error("Error saving data:", error);
-        alert("保存に失敗しました");
+    try{
+      // 1.トークンの取得
+      const token = await currentUser.getIdToken();
+
+      // 2. ヘッダーに付与してリクエスト
+      const response = await axios.post(`${API_BASE_URL}/api/shots`, newRecord,{
+        headers:{
+          Authorization: `Bearer ${token}`
+        }
       });
+
+      // 認証成功時のリクエスト
+      const savedData = response.data;
+      setData(prev => {
+        const filtered = prev.filter(r => !(r.date === queryDate && r.zoneId === selectedZone.id));
+        return [...filtered, savedData];
+      });
+      setSelectedZone(null);
+      
+    } catch (error) {
+      console.error("Error saving data:", error);
+      alert("保存に失敗しました");
+    }
   };
+  
 
   // 選択中のゾーンの既存記録を取得（編集用）
   const activeRecord = useMemo(() => {
