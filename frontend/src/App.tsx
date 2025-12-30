@@ -1,12 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-// 未使用のUser, Lockを削除
 import { Activity, BarChart2, MapPin, CheckCircle, XCircle, LogOut, Filter, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import axios from 'axios';
 
-// ★追加: Firebase関連のインポート (相対パスが正しいことを確認)
+// ★修正: Firebase設定のインポート
 import { auth, googleProvider } from './firebaseConfig';
-import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+
+// ★修正: 型 (User) を 'import type' で明示的にインポートしてエラーを回避
+import { signInWithPopup, signOut, onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
+
 
 // --- Types & Constants ---
 
