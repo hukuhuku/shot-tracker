@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Activity, BarChart2, MapPin, Filter, Calendar, ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 import axios from 'axios';
@@ -14,8 +14,8 @@ import type { ShotRecord, ZoneDef, ZoneCategory } from './types';
 // --- 2. コンポーネントのインポート ---
 import LoginForm from './components/LoginForm';
 import CourtMapInput from './components/CourtMapInput';
-import HeatmapCourt from './components/HeatMapCourt';
 import InputModal from './components/InputModal';
+import HeatMapCourt from './components/HeatMapCourt';
 
 // --- Main App Component ---
 export default function App() {
@@ -166,7 +166,7 @@ export default function App() {
   }, [data, filterPeriod]);
 
   // ヒートマップ用データフィルター
-  const heatmapData = useMemo(() => {
+  const HeatMapData = useMemo(() => {
     const today = new Date();
     let start = new Date(0);
     if (filterPeriod === '1month') start = new Date(today.setDate(today.getDate() - 30));
@@ -295,7 +295,7 @@ export default function App() {
             {/* ヒートマップコンポーネント */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden p-6">
               <h3 className="text-lg font-extrabold text-gray-800 mb-6">エリア別ヒートマップ</h3>
-              <HeatmapCourt data={heatmapData} />
+              <HeatMapCourt data={HeatMapData} />
             </div>
           </div>
         )}
