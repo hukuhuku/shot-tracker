@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Activity, BarChart2, MapPin, CheckCircle, XCircle, LogOut, Filter, User, Lock, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+// 修正1: 使っていない User, Lock を削除
+import { Activity, BarChart2, MapPin, CheckCircle, XCircle, LogOut, Filter, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import axios from 'axios';
 
 // --- Types & Constants ---
@@ -100,7 +101,7 @@ const HeatmapCourt = ({ data }: { data: ShotRecord[] }) => {
           const stats = zoneStats[zone.id] || { pct: 0, makes: 0, attempts: 0 };
           const color = getColor(stats.pct, stats.attempts);
           
-          const labelLines = zone.label.split('\n');
+          // 修正2: HeatmapCourtではラベル表示ロジックは使わないので labelLines 定義を削除しました
 
           return (
             <g key={zone.id} className="group">
@@ -181,8 +182,6 @@ const CourtMapInput = ({ onZoneClick, dailyRecords }: { onZoneClick: (zone: Zone
             <g key={zone.id} onClick={(e) => { e.stopPropagation(); onZoneClick(zone); }} className="group cursor-pointer">
               <path 
                 d={zone.path} 
-                // 変更点: 入力済み (hasRecord) の場合、'fill-red-500/20' (うっすら赤) を適用。
-                // そうでない場合は 'fill-transparent' を適用。
                 className={`stroke-orange-900/10 stroke-1 transition-all duration-150 hover:fill-orange-500/40 active:fill-orange-600/60 ${hasRecord ? 'fill-red-500/20' : 'fill-transparent'}`} 
               />
               
