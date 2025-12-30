@@ -1,4 +1,4 @@
-import { ZoneDef } from './types';
+import type { ZoneDef } from './types';
 
 // APIのベースURL
 export const API_BASE_URL = "https://shot-tracker-production.up.railway.app";
