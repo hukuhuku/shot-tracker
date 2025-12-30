@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Activity, BarChart2, MapPin, CheckCircle, XCircle, LogOut, Filter, User, Lock, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Activity, BarChart2, MapPin, CheckCircle, XCircle, LogOut, Filter, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import axios from 'axios';
 
 // --- Types & Constants ---
