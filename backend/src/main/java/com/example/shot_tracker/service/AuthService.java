@@ -10,7 +10,7 @@ public class AuthService {
 
     //Authorizationヘッダーからトークンを検証してUIDを返す
     public String verifyTokenAndGetUserId(String authHeader) throws Exception{
-        if (authHeader == null || authHeader.starsWith("Bearer")){
+        if (authHeader == null || !authHeader.startsWith("Bearer")){
             throw new Exception("Invaild Authrozation header");
         }
 
