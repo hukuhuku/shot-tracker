@@ -37,6 +37,7 @@ public class ShotController {
             return shotRepository.findByUserIdAndDate(currentUserId,date);
            
         }catch (Exception e){
+            System.err.println("Authentication Failed (GET): " + e.getMessage());
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid Token");
         }
     }
@@ -75,6 +76,7 @@ public class ShotController {
                 return shotRepository.save(requestRecord);
             }
         } catch (Exception e) {
+            System.err.println("Authentication Failed (GET): " + e.getMessage());
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid Token");
         }
     }
