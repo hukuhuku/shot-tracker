@@ -11,9 +11,8 @@ public class AuthService {
     //Authorizationヘッダーからトークンを検証してUIDを返す
     public String verifyTokenAndGetUserId(String authHeader) throws Exception{
         if (authHeader == null || !authHeader.startsWith("Bearer")){
-            throw new Exception("Invaild Authrozation header");
+            throw new Exception("Invalid Auth header");
         }
-
         String idToken = authHeader.substring(7);
 
         try{
@@ -21,7 +20,8 @@ public class AuthService {
             FirebaseToken decodeToken = FirebaseAuth.getInstance().verifyIdToken(idToken);
             return decodeToken.getUid();
         } catch (FirebaseAuthException e){
-            throw new Exception("Token verification failed");
+            System.err.println("Auth Error: Token verification failed. " + e.getMessage());
+            throw new Exception("Token verification failed: " + e.getMessage());
         }
     }
 }
