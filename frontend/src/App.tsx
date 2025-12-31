@@ -30,8 +30,6 @@ export default function App() {
   const [filterCategory, setFilterCategory] = useState<ZoneCategory | 'Total'>('Total');
   const [selectedDate, setSelectedDate] = useState(new Date());
   
-  // ★削除: DemoModeのState削除
-
   // ==========================================
   //  Effects (副作用: 通信や監視)
   // ==========================================
@@ -208,18 +206,17 @@ export default function App() {
         <div className="flex items-center space-x-2">
           <div className="bg-orange-500 p-1.5 rounded-lg shadow-sm"><Activity className="text-white w-5 h-5" /></div>
           <span className="font-extrabold text-xl tracking-tight text-gray-800">ShotTracker <span className="text-orange-500">Pro</span></span>
-          {/* ★削除: Demoバッジの表示削除 */}
         </div>
         <button onClick={() => signOut(auth)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"><LogOut className="w-5 h-5" /></button>
       </header>
 
       <main className="max-w-3xl mx-auto p-4 sm:p-6 space-y-6">
         {/* Tab Switcher */}
-        <div className="flex p-1.5 bg-white rounded-xl shadow-sm border border-gray-100">
-          <button onClick={() => setCurrentTab('input')} className={`flex-1 flex items-center justify-center space-x-2 py-2.5 rounded-lg text-sm font-bold transition-all ${currentTab === 'input' ? 'bg-orange-50 text-orange-700 shadow-sm ring-1 ring-orange-100' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
+        <div className="flex p-1 bg-white rounded-xl shadow-sm border border-gray-100">
+          <button onClick={() => setCurrentTab('input')} className={`flex-1 flex items-center justify-center space-x-2 py-1.5 rounded-lg text-sm font-bold transition-all ${currentTab === 'input' ? 'bg-orange-50 text-orange-700 shadow-sm ring-1 ring-orange-100' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
             <MapPin className={`w-4 h-4 ${currentTab === 'input' ? 'text-orange-500' : ''}`} /><span>記録</span>
           </button>
-          <button onClick={() => setCurrentTab('analysis')} className={`flex-1 flex items-center justify-center space-x-2 py-2.5 rounded-lg text-sm font-bold transition-all ${currentTab === 'analysis' ? 'bg-orange-50 text-orange-700 shadow-sm ring-1 ring-orange-100' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
+          <button onClick={() => setCurrentTab('analysis')} className={`flex-1 flex items-center justify-center space-x-2 py-1.5 rounded-lg text-sm font-bold transition-all ${currentTab === 'analysis' ? 'bg-orange-50 text-orange-700 shadow-sm ring-1 ring-orange-100' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
             <BarChart2 className={`w-4 h-4 ${currentTab === 'analysis' ? 'text-orange-500' : ''}`} /><span>分析</span>
           </button>
         </div>
@@ -228,10 +225,10 @@ export default function App() {
         {currentTab === 'input' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
             {/* Date Navigator */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-4 flex items-center justify-between">
-              <button onClick={() => changeDate(-1)} className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"><ChevronLeft className="w-6 h-6" /></button>
-              <div className="flex items-center gap-2 font-bold text-gray-800 text-lg"><Calendar className="w-5 h-5 text-orange-500" />{selectedDate.toLocaleDateString('ja-JP')}</div>
-              <button onClick={() => changeDate(1)} className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"><ChevronRight className="w-6 h-6" /></button>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-2 flex items-center justify-between">
+              <button onClick={() => changeDate(-1)} className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"><ChevronLeft className="w-6 h-6" /></button>
+              <div className="flex items-center gap-2 font-bold text-gray-800 text-sm"><Calendar className="w-5 h-5 text-orange-500" />{selectedDate.toLocaleDateString('ja-JP')}</div>
+              <button onClick={() => changeDate(1)} className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"><ChevronRight className="w-6 h-6" /></button>
             </div>
 
             {/* コートマップ入力コンポーネント */}
