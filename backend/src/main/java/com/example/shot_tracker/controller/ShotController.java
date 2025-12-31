@@ -27,15 +27,27 @@ public class ShotController {
     public List<ShotRecord> getRecords(
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start_date,
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end_date,
             @RequestHeader("Authorization") String authHeader){
         try{
             //トークンを検証してUIDを取得(なりすまし防止)
             String currentUserId = authService.verifyTokenAndGetUserId(authHeader);
 
-            //dateがnullの場合は当日の日付を入れる
-            if (date == null) date = LocalDate.now();
-            return shotRepository.findByUserIdAndDate(currentUserId,date);
-           
+            // 1.dateが指定されている場合はその日のデータを返す
+            if (date != null) {
+                return shotRepository.findByUserIdAndDate(currentUserId,date);
+
+            // 2. start_dateが指定されているときはstart_date~end_dateのデータを返す
+            }else if (start_date != null) {
+                // 2.a end_dateがNULLの場合は当日=end_dateとする
+                if (end_date == null){end_date = LocalDate.now();}
+                return shotRepository.findByUserIdAndDateBetween(currentUserId,start_date,end_date);
+
+            // 3. 何も指定がないときはそのユーザーのすべてのデータを返す
+            }else {
+                return shotRepository.findByUserId(currentUserId);
+            }
         }catch (Exception e){
             System.err.println("Authentication Failed (GET): " + e.getMessage());
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid Token");
