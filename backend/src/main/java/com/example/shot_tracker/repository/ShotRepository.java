@@ -13,13 +13,7 @@ public interface ShotRepository extends JpaRepository<ShotRecord, Long> {
 //
     //1. 特定ユーザーの記録を全取得する
     List<ShotRecord> findByUserId(String UserID);
-
-    // 2. 特定期間のユーザー記録を取得する。
-    List<ShotRecord> findByUserIdAndDateBetween(String userId, LocalDate startDate, LocalDate endDate);
-
-    // 3. 特定ユーザーの特定日のユーザー記録を取得する
-    List<ShotRecord> findByUserIdAndDate(String currentUserId, LocalDate date);
-
-    // 4. Insert or Add の判定に利用
+    
+    // 2. Insert or Add の判定に利用
     Optional<ShotRecord> findByUserIdAndDateAndZoneId(String userId, LocalDate date, String zoneId);
 }
