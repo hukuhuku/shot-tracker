@@ -63,9 +63,7 @@ const CourtMapInput = ({ onZoneClick, dailyRecords }: { onZoneClick: (zone: Zone
         })}
         <line x1="0" y1="450" x2="500" y2="450" stroke="#1f2937" strokeWidth="4" />
       </svg>
-      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 text-xs font-bold text-gray-500/80 pointer-events-none">TAP TO RECORD</div>
     </div>
   );
 };
-
 export default CourtMapInput;
