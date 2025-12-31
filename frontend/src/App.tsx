@@ -271,7 +271,7 @@ export default function App() {
 
         {/* --- ANALYSIS TAB --- */}
         {currentTab === 'analysis' && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+          <div className="space-y-2 animate-in fade-in slide-in-from-right-4 duration-300">
             {/* フィルターUI */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200/50">
               <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5">
