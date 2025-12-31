@@ -25,7 +25,6 @@ public class ShotController {
 
     @GetMapping
     public List<ShotRecord> getRecords(
-            @RequestParam(required = false)
             @RequestHeader("Authorization") String authHeader){
         try{
             // 1.トークンを検証してUIDを取得(なりすまし防止)
