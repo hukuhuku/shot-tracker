@@ -210,7 +210,7 @@ export default function App() {
         <button onClick={() => signOut(auth)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"><LogOut className="w-5 h-5" /></button>
       </header>
 
-      <main className="max-w-3xl mx-auto p-4 sm:p-6 space-y-6">
+      <main className="max-w-3xl mx-auto p-4 sm:p-2 space-y-2">
         {/* Tab Switcher */}
         <div className="flex p-1 bg-white rounded-xl shadow-sm border border-gray-100">
           <button onClick={() => setCurrentTab('input')} className={`flex-1 flex items-center justify-center space-x-2 py-1.5 rounded-lg text-sm font-bold transition-all ${currentTab === 'input' ? 'bg-orange-50 text-orange-700 shadow-sm ring-1 ring-orange-100' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
@@ -223,7 +223,7 @@ export default function App() {
 
         {/* --- INPUT TAB --- */}
         {currentTab === 'input' && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-300">
             {/* Date Navigator */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-2 flex items-center justify-between">
               <button onClick={() => changeDate(-1)} className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"><ChevronLeft className="w-6 h-6" /></button>
@@ -234,7 +234,7 @@ export default function App() {
             {/* コートマップ入力コンポーネント */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-2 sm:p-6 overflow-hidden">
               <div className="mb-4 text-center">
-                 <h2 className="text-lg font-extrabold text-gray-800">シュートエリアを選択</h2>
+                 <h3 className="text-sm font-extrabold text-gray-800">シュートエリアを選択</h3>
                  <p className="text-xs text-gray-500">コート上の記録したい場所をタップしてください</p>
               </div>
               <CourtMapInput onZoneClick={setSelectedZone} dailyRecords={dailyRecords} />
