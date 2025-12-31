@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { XCircle, CheckCircle } from 'lucide-react';
-import type { ZoneDef } from '../types'; // 型定義をインポート
+import type { ZoneDef } from '../types';
 
 interface Props {
-  zone: ZoneDef;                // どこのエリアのシュートか
-  initialMakes?: number;        // 元々の成功数（編集時用）
-  initialAttempts?: number;     // 元々の試投数
-  onClose: () => void;          // 閉じるボタンが押されたとき
-  onSave: (makes: number, attempts: number) => void; // 保存ボタンが押されたとき
+  zone: ZoneDef;
+  initialMakes?: number;
+  initialAttempts?: number;
+  onClose: () => void;
+  onSave: (makes: number, attempts: number) => void;
 }
 
 const InputModal: React.FC<Props> = ({ 
@@ -17,21 +17,19 @@ const InputModal: React.FC<Props> = ({
   onClose, 
   onSave 
 }) => {
-  // このモーダルの中だけで使う「一時的な数字」の状態
-  // 初期値がなければ、とりあえず 10本中5本 からスタートするようにしています
   const [attempts, setAttempts] = useState(initialAttempts > 0 ? initialAttempts : 10);
   const [makes, setMakes] = useState(initialMakes > 0 ? initialMakes : 5);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(makes, attempts); // 親（App.tsx）に数字を渡す
+    onSave(makes, attempts);
   };
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-200 backdrop-blur-sm">
       <div className="bg-white w-full max-w-sm rounded-t-2xl sm:rounded-2xl p-6 shadow-2xl animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200">
         
-        {/* ヘッダー部分: エリア名と閉じるボタン */}
+        {/* ヘッダー部分 */}
         <div className="flex justify-between items-start mb-6">
           <div>
             <span className="block text-xs font-bold text-orange-600 uppercase tracking-wider mb-1">{zone.category} Area</span>
@@ -43,12 +41,13 @@ const InputModal: React.FC<Props> = ({
           </button>
         </div>
 
-        {/* 入力フォーム部分 */}
         <div className="space-y-6">
-          <div className="flex justify-between items-center bg-gray-50 p-5 rounded-xl border border-gray-100">
+          {/* ▼▼▼ ここを修正しました ▼▼▼ */}
+          {/* flex-col(縦並び)を基本にし、sm:flex-row(横並び)で切り替えます */}
+          <div className="flex flex-col sm:flex-row justify-between items-center bg-gray-50 p-4 sm:p-5 rounded-xl border border-gray-100 gap-4 sm:gap-0">
             
-            {/* 試投数 (Attempts) の入力 */}
-            <div className="text-center flex-1">
+            {/* 試投数 (Attempts) */}
+            <div className="text-center flex-1 w-full sm:w-auto">
               <label className="block text-xs text-gray-500 font-bold uppercase tracking-wide mb-2">試投数</label>
               <div className="flex items-center justify-center space-x-4">
                 <button 
@@ -67,8 +66,9 @@ const InputModal: React.FC<Props> = ({
               </div>
             </div>
 
-            {/* 成功数 (Makes) の入力 */}
-            <div className="text-center flex-1 border-l border-gray-200 pl-6">
+            {/* 成功数 (Makes) */}
+            {/* モバイル時は上に線(border-t)、PC時は左に線(border-l)に切り替え */}
+            <div className="text-center flex-1 w-full sm:w-auto border-t sm:border-t-0 sm:border-l border-gray-200 pt-4 sm:pt-0 sm:pl-6">
               <label className="block text-xs text-gray-500 font-bold uppercase tracking-wide mb-2">成功数</label>
                <div className="flex items-center justify-center space-x-4">
                 <button 
@@ -79,7 +79,6 @@ const InputModal: React.FC<Props> = ({
                 </button>
                 <span className="text-3xl font-extrabold w-12 text-center text-green-600">{makes}</span>
                 <button 
-                  // 成功数が試投数を超えないように制御 (Math.min)
                   onClick={() => setMakes(Math.min(attempts, makes + 1))} 
                   className="w-10 h-10 rounded-full bg-white border border-green-200 shadow-sm flex items-center justify-center text-green-600 font-bold"
                 >
@@ -88,8 +87,8 @@ const InputModal: React.FC<Props> = ({
               </div>
             </div>
           </div>
+          {/* ▲▲▲ 修正ここまで ▲▲▲ */}
 
-          {/* 保存ボタン */}
           <button 
             onClick={handleSubmit} 
             className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-4 rounded-xl flex items-center justify-center space-x-2 shadow-md transition-colors"
