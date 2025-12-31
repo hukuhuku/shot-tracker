@@ -74,7 +74,7 @@ public class ShotController {
                 return shotRepository.save(requestRecord);
             }
         } catch (Exception e) {
-            System.err.println("Authentication Failed (GET): " + e.getMessage());
+            System.err.println("Authentication Failed (ADD/SET): " + e.getMessage());
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid Token");
         }
     }
