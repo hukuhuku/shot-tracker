@@ -10,7 +10,7 @@ public class AuthService {
 
     //Authorizationヘッダーからトークンを検証してUIDを返す
     public String verifyTokenAndGetUserId(String authHeader) throws Exception{
-        if (authHeader == null || !authHeader.startsWith("Bearer ")){
+        if (authHeader == null || !authHeader.startsWith("Bearer")){
             throw new Exception("Invalid Auth header");
         }
         String idToken = authHeader.substring(7);
