@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Activity, BarChart2, MapPin, Filter, Calendar, ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Activity, BarChart2, MapPin, Calendar, ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 import axios from 'axios';
 
 // --- 1. 設定・型・定数のインポート ---
@@ -9,7 +9,7 @@ import { signOut, onAuthStateChanged } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
 
 import { API_BASE_URL } from './constants';
-import type { ShotRecord, ZoneDef, ZoneCategory } from './types';
+import type { ShotRecord, ZoneDef } from './types';
 
 // --- 2. コンポーネントのインポート ---
 import LoginForm from './components/LoginForm';
@@ -26,8 +26,7 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<'input' | 'analysis'>('input');
   const [data, setData] = useState<ShotRecord[]>([]); 
   const [selectedZone, setSelectedZone] = useState<ZoneDef | null>(null);
-  const [filterPeriod, setFilterPeriod] = useState<'1month' | '1year' | 'all'>('1month');
-  const [filterCategory, setFilterCategory] = useState<ZoneCategory | 'Total'>('Total');
+  const [filterPeriod, setFilterPeriod] = useState<'1month' | '1year'>('1month');
   const [selectedDate, setSelectedDate] = useState(new Date());
   
   // ==========================================
@@ -173,39 +172,45 @@ export default function App() {
     return { totalAttempts, totalMakes, avgPct, sessionCount: sessionDays.length };
   }, [recentSessionsData]);
 
-  // トレンドグラフデータ
+  // トレンドグラフデータ（全日程スロット生成で時系列表示）
   const analysisTrendData = useMemo(() => {
-    let filtered = data;
     const today = new Date();
-    if (filterPeriod === '1month') { const d = new Date(); d.setDate(today.getDate() - 30); filtered = filtered.filter(x => new Date(x.date) >= d); }
-    else if (filterPeriod === '1year') { const d = new Date(); d.setDate(today.getDate() - 365); filtered = filtered.filter(x => new Date(x.date) >= d); }
-    
-    const grouped = filtered.reduce((acc, curr) => {
-      const date = curr.date;
-      if (!acc[date]) acc[date] = { date, totalM: 0, totalA: 0, paintM: 0, paintA: 0, midM: 0, midA: 0, p3M: 0, p3A: 0 };
-      const rec = acc[date];
-      rec.totalM += curr.makes; rec.totalA += curr.attempts;
+    const days = filterPeriod === '1month' ? 30 : 365;
+    const startDay = new Date(today);
+    startDay.setDate(today.getDate() - (days - 1));
+
+    const grouped = data.reduce((acc, curr) => {
+      if (new Date(curr.date) < startDay) return acc;
+      if (!acc[curr.date]) acc[curr.date] = { paintM: 0, paintA: 0, midM: 0, midA: 0, p3M: 0, p3A: 0 };
+      const rec = acc[curr.date];
       if (curr.category === 'Paint') { rec.paintM += curr.makes; rec.paintA += curr.attempts; }
       if (curr.category === 'Mid') { rec.midM += curr.makes; rec.midA += curr.attempts; }
       if (curr.category === '3PT') { rec.p3M += curr.makes; rec.p3A += curr.attempts; }
       return acc;
-    }, {} as any);
-    
-    return Object.values(grouped).sort((a:any, b:any) => new Date(a.date).getTime() - new Date(b.date).getTime()).map((d: any) => ({
-      date: d.date,
-      Total: d.totalA > 0 ? Math.round((d.totalM/d.totalA)*100) : null,
-      Paint: d.paintA > 0 ? Math.round((d.paintM/d.paintA)*100) : null,
-      Mid: d.midA > 0 ? Math.round((d.midM/d.midA)*100) : null,
-      '3PT': d.p3A > 0 ? Math.round((d.p3M/d.p3A)*100) : null,
-    }));
+    }, {} as Record<string, { paintM: number, paintA: number, midM: number, midA: number, p3M: number, p3A: number }>);
+
+    const result = [];
+    for (let i = 0; i < days; i++) {
+      const d = new Date(startDay);
+      d.setDate(startDay.getDate() + i);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const s = grouped[dateStr];
+      result.push({
+        date: dateStr,
+        Paint: s && s.paintA > 0 ? Math.round((s.paintM / s.paintA) * 100) : null,
+        Mid: s && s.midA > 0 ? Math.round((s.midM / s.midA) * 100) : null,
+        '3PT': s && s.p3A > 0 ? Math.round((s.p3M / s.p3A) * 100) : null,
+      });
+    }
+    return result;
   }, [data, filterPeriod]);
 
   // ヒートマップ用データフィルター
   const HeatMapData = useMemo(() => {
     const today = new Date();
-    let start = new Date(0);
-    if (filterPeriod === '1month') start = new Date(today.setDate(today.getDate() - 30));
-    if (filterPeriod === '1year') start = new Date(today.setDate(today.getDate() - 365));
+    const days = filterPeriod === '1month' ? 30 : 365;
+    const start = new Date(today);
+    start.setDate(today.getDate() - days);
     return data.filter(d => new Date(d.date) >= start);
   }, [data, filterPeriod]);
 
@@ -291,23 +296,13 @@ export default function App() {
           <div className="space-y-2 animate-in fade-in slide-in-from-right-4 duration-300">
             {/* フィルターUI */}
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200/50">
-              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5">
-                <div className="flex-1">
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1"><Filter className="w-3 h-3"/>カテゴリー</label>
-                  <div className="flex flex-wrap gap-2">
-                    {(['Total', 'Paint', 'Mid', '3PT'] as const).map(cat => (
-                      <button key={cat} onClick={() => setFilterCategory(cat)} className={`px-4 py-2 text-xs font-bold rounded-full transition-all shadow-sm ${filterCategory === cat ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 border border-gray-200'}`}>{cat === 'Total' ? 'Total (全体)' : cat}</button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">期間</label>
-                  <select value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value as any)} className="bg-white border border-gray-200 text-gray-700 font-bold text-sm rounded-xl block w-full pl-4 pr-10 py-2.5">
-                    <option value="1month">直近 1ヶ月</option>
-                    <option value="1year">直近 1年</option>
-                    <option value="all">全期間</option>
-                  </select>
-                </div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">期間</label>
+              <div className="flex gap-2">
+                {(['1month', '1year'] as const).map(p => (
+                  <button key={p} onClick={() => setFilterPeriod(p)} className={`px-4 py-2 text-xs font-bold rounded-full transition-all shadow-sm ${filterPeriod === p ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 border border-gray-200'}`}>
+                    {p === '1month' ? '直近 1ヶ月' : '直近 1年'}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -318,10 +313,13 @@ export default function App() {
                  <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={analysisTrendData} margin={{ top: 10, right: 10, bottom: 0, left: -15 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={true} horizontal={true} stroke="#e5e7eb" />
-                      <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(val) => val.slice(5).replace('-', '/')} axisLine={false} tickLine={false} dy={10} />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(val) => val.slice(5).replace('-', '/')} axisLine={false} tickLine={false} dy={10} interval={filterPeriod === '1month' ? 4 : 30} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={(val) => `${val}%`} axisLine={false} tickLine={false} dx={-10} />
-                      <Tooltip />
-                      <Line type="monotone" dataKey={filterCategory} stroke="#374151" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      <Tooltip formatter={(val) => val !== null ? `${val}%` : '—'} labelFormatter={(label) => label.replace('-', '/').slice(2)} />
+                      <Legend verticalAlign="top" height={36} />
+                      <Line type="monotone" dataKey="Paint" stroke="#f97316" strokeWidth={2} dot={false} activeDot={{ r: 5 }} connectNulls={true} />
+                      <Line type="monotone" dataKey="Mid" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 5 }} connectNulls={true} />
+                      <Line type="monotone" dataKey="3PT" stroke="#22c55e" strokeWidth={2} dot={false} activeDot={{ r: 5 }} connectNulls={true} />
                     </LineChart>
                  </ResponsiveContainer>
                </div>
