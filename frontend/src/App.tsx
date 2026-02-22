@@ -136,25 +136,41 @@ export default function App() {
 
   // --- 分析用データ計算ロジック (グラフ用) ---
   
-  // 直近セッションデータ
+  // 直近1ヶ月データ（全30日分のスロットを生成し、練習がない日はnull）
   const recentSessionsData = useMemo(() => {
+    const today = new Date();
+    const startDay = new Date(today);
+    startDay.setDate(today.getDate() - 29);
+
     const grouped = data.reduce((acc, curr) => {
-      if (!acc[curr.date]) acc[curr.date] = { date: curr.date, makes: 0, attempts: 0 };
+      if (!acc[curr.date]) acc[curr.date] = { makes: 0, attempts: 0 };
       acc[curr.date].makes += curr.makes;
       acc[curr.date].attempts += curr.attempts;
       return acc;
-    }, {} as Record<string, { date: string, makes: number, attempts: number }>);
-    return Object.values(grouped)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      .slice(-7)
-      .map(d => ({...d, pct: d.attempts > 0 ? Math.round((d.makes / d.attempts) * 100) : 0}));
+    }, {} as Record<string, { makes: number, attempts: number }>);
+
+    const result = [];
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(startDay);
+      d.setDate(startDay.getDate() + i);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const session = grouped[dateStr];
+      result.push({
+        date: dateStr,
+        makes: session?.makes ?? 0,
+        attempts: session?.attempts ?? 0,
+        pct: session && session.attempts > 0 ? Math.round((session.makes / session.attempts) * 100) : null,
+      });
+    }
+    return result;
   }, [data]);
 
   const recentSessionsStats = useMemo(() => {
-    const totalAttempts = recentSessionsData.reduce((acc, curr) => acc + curr.attempts, 0);
-    const totalMakes = recentSessionsData.reduce((acc, curr) => acc + curr.makes, 0);
+    const sessionDays = recentSessionsData.filter(d => d.attempts > 0);
+    const totalAttempts = sessionDays.reduce((acc, curr) => acc + curr.attempts, 0);
+    const totalMakes = sessionDays.reduce((acc, curr) => acc + curr.makes, 0);
     const avgPct = totalAttempts > 0 ? Math.round((totalMakes / totalAttempts) * 100) : 0;
-    return { totalAttempts, totalMakes, avgPct };
+    return { totalAttempts, totalMakes, avgPct, sessionCount: sessionDays.length };
   }, [recentSessionsData]);
 
   // トレンドグラフデータ
@@ -240,13 +256,14 @@ export default function App() {
               <CourtMapInput onZoneClick={setSelectedZone} dailyRecords={dailyRecords} />
             </div>
 
-            {/* 直近の推移グラフ */}
+            {/* 直近1ヶ月の推移グラフ */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-5 sm:p-6">
                <div className="flex justify-between items-start mb-6">
                  <div>
-                   <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide">直近7回の全体確率</h3>
+                   <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide">直近1ヶ月の推移</h3>
                    <div className="flex items-baseline space-x-3 mt-1">
                      <span className="text-4xl font-extrabold text-gray-900">{recentSessionsStats.avgPct}<span className="text-2xl">%</span></span>
+                     <span className="text-sm text-gray-400">{recentSessionsStats.sessionCount}回練習</span>
                    </div>
                  </div>
                  <div className="text-right bg-orange-50 p-3 rounded-xl border border-orange-100">
@@ -258,10 +275,10 @@ export default function App() {
                  <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={recentSessionsData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(val) => val.slice(5).replace('-', '/')} axisLine={false} tickLine={false} dy={10} />
+                      <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(val) => val.slice(5).replace('-', '/')} axisLine={false} tickLine={false} dy={10} interval={6} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickFormatter={(val) => `${val}%`} axisLine={false} tickLine={false} dx={-5} />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="pct" stroke="#ea580c" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      <Tooltip formatter={(val) => val !== null ? `${val}%` : '—'} labelFormatter={(label) => label.replace('-', '/').slice(2)} />
+                      <Line type="monotone" dataKey="pct" stroke="#ea580c" strokeWidth={3} dot={(props) => props.payload.pct !== null ? <circle key={props.key} cx={props.cx} cy={props.cy} r={4} fill="#ea580c" stroke="#fff" strokeWidth={2} /> : <g key={props.key} />} activeDot={{ r: 6 }} connectNulls={false} />
                     </LineChart>
                  </ResponsiveContainer>
                </div>

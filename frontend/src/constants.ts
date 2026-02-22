@@ -1,7 +1,7 @@
 import type { ZoneDef } from './types';
 
 // APIのベースURL
-export const API_BASE_URL = "https://shot-tracker-production.up.railway.app";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // コートの描画データ
 export const COURT_ZONES: ZoneDef[] = [

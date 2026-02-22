@@ -15,7 +15,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/shots")
-@CrossOrigin(origins="https://shot-tracker-theta.vercel.app/")
+@CrossOrigin(origins={"https://shot-tracker-theta.vercel.app/", "http://localhost:5173"})
 public class ShotController {
     @Autowired
     private ShotRepository shotRepository;
