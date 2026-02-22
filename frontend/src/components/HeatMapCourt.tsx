@@ -5,9 +5,10 @@ import type { ShotRecord } from '../types';
 
 interface Props {
   data: ShotRecord[];
+  goalPct?: number | null;
 }
 
-const HeatMapCourt: React.FC<Props> = ({ data }) => {
+const HeatMapCourt: React.FC<Props> = ({ data, goalPct }) => {
   // 親から受け取った data が変わったときだけ、エリアごとの確率を再計算します
   const zoneStats = useMemo(() => {
     return COURT_ZONES.reduce((acc, zone) => {
@@ -22,12 +23,21 @@ const HeatMapCourt: React.FC<Props> = ({ data }) => {
   }, [data]);
 
   // 色決定ロジック
-  const getColor = (pct: number, attempts: number) => {
+  const getColor = (pct: number, attempts: number, goal?: number | null) => {
     if (attempts === 0) return '#f3f4f6'; // グレー (データなし)
-    if (pct >= 50) return '#ef4444'; // 赤 (Hot)
-    if (pct >= 40) return '#f97316'; // オレンジ
-    if (pct >= 30) return '#eab308'; // 黄色
-    return '#3b82f6'; // 青 (Cold)
+
+    if (goal != null) {
+      if (pct >= goal + 10) return '#ef4444'; // 目標+10以上: 赤
+      if (pct >= goal)      return '#f97316'; // 目標以上: オレンジ
+      if (pct >= goal - 10) return '#eab308'; // 目標-10以上: 黄
+      return '#3b82f6';                       // 目標-10未満: 青
+    }
+
+    // 目標未設定: 現行ロジック
+    if (pct >= 50) return '#ef4444';
+    if (pct >= 40) return '#f97316';
+    if (pct >= 30) return '#eab308';
+    return '#3b82f6';
   };
 
   return (
@@ -41,7 +51,7 @@ const HeatMapCourt: React.FC<Props> = ({ data }) => {
         {/* 各ゾーンの描画 */}
         {COURT_ZONES.map((zone) => {
           const stats = zoneStats[zone.id] || { pct: 0, makes: 0, attempts: 0 };
-          const color = getColor(stats.pct, stats.attempts);
+          const color = getColor(stats.pct, stats.attempts, goalPct);
           
           return (
             <g key={zone.id} className="group">

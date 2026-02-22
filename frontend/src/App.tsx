@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Activity, BarChart2, MapPin, Calendar, ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { Activity, BarChart2, MapPin, Calendar, ChevronLeft, ChevronRight, LogOut, Target } from 'lucide-react';
 import axios from 'axios';
 
 // --- 1. 設定・型・定数のインポート ---
@@ -23,8 +23,10 @@ export default function App() {
   //  State (状態管理)
   // ==========================================
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
-  const [currentTab, setCurrentTab] = useState<'input' | 'analysis'>('input');
-  const [data, setData] = useState<ShotRecord[]>([]); 
+  const [currentTab, setCurrentTab] = useState<'input' | 'analysis' | 'goal'>('input');
+  const [data, setData] = useState<ShotRecord[]>([]);
+  const [goalPct, setGoalPct] = useState<number | null>(null);
+  const [goalPctInput, setGoalPctInput] = useState<number | null>(null);
   const [selectedZone, setSelectedZone] = useState<ZoneDef | null>(null);
   const [filterPeriod, setFilterPeriod] = useState<'1month' | '1year'>('1month');
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -44,25 +46,27 @@ export default function App() {
   // データ取得
   useEffect(() => {
     if (currentUser) {
-      const fetchData = async () => {
-        try{
-          //1.トークンの取得
+      const fetchAll = async () => {
+        try {
           const token = await currentUser.getIdToken();
+          const headers = { Authorization: `Bearer ${token}` };
 
-          //2.ヘッダーに付与してリクエスト
-          const response = await axios.get(`${API_BASE_URL}/api/shots`,{
-            headers:{
-              Authorization: `Bearer ${token}` // "Bearer " の後ろにトークン
-            }
-          });
+          const [shotsRes, settingsRes] = await Promise.all([
+            axios.get(`${API_BASE_URL}/api/shots`, { headers }),
+            axios.get(`${API_BASE_URL}/api/settings`, { headers }),
+          ]);
 
           console.log("Connected to backend");
-          setData(response.data);
-        }catch (error){
-          console.log("Backend not reachable or Auth failed.",error);
+          setData(shotsRes.data);
+
+          const fetchedGoal = settingsRes.data.goalPct ?? null;
+          setGoalPct(fetchedGoal);
+          setGoalPctInput(fetchedGoal);
+        } catch (error) {
+          console.log("Backend not reachable or Auth failed.", error);
         }
       };
-      fetchData();
+      fetchAll();
     }
   }, [currentUser]);
 
@@ -126,6 +130,22 @@ export default function App() {
     }
   };
   
+
+  // 目標保存処理
+  const handleSaveGoal = async () => {
+    if (!currentUser) return;
+    try {
+      const token = await currentUser.getIdToken();
+      await axios.post(`${API_BASE_URL}/api/settings`, { goalPct: goalPctInput }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setGoalPct(goalPctInput);
+      alert('目標を保存しました');
+    } catch (error) {
+      console.error("Error saving goal:", error);
+      alert('保存に失敗しました');
+    }
+  };
 
   // 選択中のゾーンの既存記録を取得（編集用）
   const activeRecord = useMemo(() => {
@@ -240,6 +260,9 @@ export default function App() {
           <button onClick={() => setCurrentTab('analysis')} className={`flex-1 flex items-center justify-center space-x-2 py-1.5 rounded-lg text-sm font-bold transition-all ${currentTab === 'analysis' ? 'bg-orange-50 text-orange-700 shadow-sm ring-1 ring-orange-100' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
             <BarChart2 className={`w-4 h-4 ${currentTab === 'analysis' ? 'text-orange-500' : ''}`} /><span>分析</span>
           </button>
+          <button onClick={() => setCurrentTab('goal')} className={`flex-1 flex items-center justify-center space-x-2 py-1.5 rounded-lg text-sm font-bold transition-all ${currentTab === 'goal' ? 'bg-orange-50 text-orange-700 shadow-sm ring-1 ring-orange-100' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
+            <Target className={`w-4 h-4 ${currentTab === 'goal' ? 'text-orange-500' : ''}`} /><span>目標</span>
+          </button>
         </div>
 
         {/* --- INPUT TAB --- */}
@@ -284,6 +307,10 @@ export default function App() {
                       <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickFormatter={(val) => `${val}%`} axisLine={false} tickLine={false} dx={-5} />
                       <Tooltip formatter={(val) => val !== null ? `${val}%` : '—'} labelFormatter={(label) => label.replace('-', '/').slice(2)} />
                       <Line type="monotone" dataKey="pct" stroke="#ea580c" strokeWidth={3} dot={(props) => props.payload.pct !== null ? <circle key={props.key} cx={props.cx} cy={props.cy} r={4} fill="#ea580c" stroke="#fff" strokeWidth={2} /> : <g key={props.key} />} activeDot={{ r: 6 }} connectNulls={true} />
+                      {goalPct !== null && (
+                        <ReferenceLine y={goalPct} stroke="#374151" strokeDasharray="5 5"
+                          label={{ value: `目標 ${goalPct}%`, position: 'insideTopRight', fontSize: 10, fill: '#374151' }} />
+                      )}
                     </LineChart>
                  </ResponsiveContainer>
                </div>
@@ -320,6 +347,10 @@ export default function App() {
                       <Line type="monotone" dataKey="Paint" stroke="#f97316" strokeWidth={2} dot={(props) => props.payload.Paint !== null ? <circle key={props.key} cx={props.cx} cy={props.cy} r={3} fill="#f97316" stroke="#fff" strokeWidth={2} /> : <g key={props.key} />} activeDot={{ r: 5 }} connectNulls={true} />
                       <Line type="monotone" dataKey="Mid" stroke="#3b82f6" strokeWidth={2} dot={(props) => props.payload.Mid !== null ? <circle key={props.key} cx={props.cx} cy={props.cy} r={3} fill="#3b82f6" stroke="#fff" strokeWidth={2} /> : <g key={props.key} />} activeDot={{ r: 5 }} connectNulls={true} />
                       <Line type="monotone" dataKey="3PT" stroke="#22c55e" strokeWidth={2} dot={(props) => props.payload['3PT'] !== null ? <circle key={props.key} cx={props.cx} cy={props.cy} r={3} fill="#22c55e" stroke="#fff" strokeWidth={2} /> : <g key={props.key} />} activeDot={{ r: 5 }} connectNulls={true} />
+                      {goalPct !== null && (
+                        <ReferenceLine y={goalPct} stroke="#374151" strokeDasharray="5 5"
+                          label={{ value: `目標 ${goalPct}%`, position: 'insideTopRight', fontSize: 10, fill: '#374151' }} />
+                      )}
                     </LineChart>
                  </ResponsiveContainer>
                </div>
@@ -328,8 +359,58 @@ export default function App() {
             {/* ヒートマップコンポーネント */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden p-6">
               <h3 className="text-lg font-extrabold text-gray-800 mb-6">エリア別ヒートマップ</h3>
-              <HeatMapCourt data={HeatMapData} />
+              <HeatMapCourt data={HeatMapData} goalPct={goalPct} />
             </div>
+          </div>
+        )}
+
+        {/* --- GOAL TAB --- */}
+        {currentTab === 'goal' && (
+          <div className="space-y-2 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-6">
+              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-6">目標確率の設定</h3>
+              <div className="flex flex-col items-center gap-6">
+                <div className="text-center">
+                  <div className="text-6xl font-extrabold text-gray-900">
+                    {goalPctInput !== null ? `${goalPctInput}%` : '未設定'}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">目標シュート成功率</div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => setGoalPctInput(prev => prev === null ? 0 : Math.max(0, prev - 5))}
+                    className="w-14 h-14 rounded-full bg-gray-100 text-gray-700 text-xl font-bold hover:bg-gray-200 transition-colors flex items-center justify-center"
+                  >
+                    −5%
+                  </button>
+                  <button
+                    onClick={() => setGoalPctInput(prev => prev === null ? 50 : Math.min(100, prev + 5))}
+                    className="w-14 h-14 rounded-full bg-gray-100 text-gray-700 text-xl font-bold hover:bg-gray-200 transition-colors flex items-center justify-center"
+                  >
+                    +5%
+                  </button>
+                </div>
+                <div className="flex gap-3 w-full">
+                  <button
+                    onClick={() => setGoalPctInput(null)}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+                  >
+                    未設定にする
+                  </button>
+                  <button
+                    onClick={handleSaveGoal}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-orange-500 text-white hover:bg-orange-600 transition-colors shadow-sm"
+                  >
+                    保存する
+                  </button>
+                </div>
+              </div>
+            </div>
+            {goalPct !== null && (
+              <div className="bg-orange-50 rounded-2xl border border-orange-100 p-4 text-sm text-orange-800">
+                <span className="font-bold">現在の目標:</span> {goalPct}%
+              </div>
+            )}
           </div>
         )}
       </main>
