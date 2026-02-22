@@ -317,9 +317,9 @@ export default function App() {
                       <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={(val) => `${val}%`} axisLine={false} tickLine={false} dx={-10} />
                       <Tooltip formatter={(val) => val !== null ? `${val}%` : '—'} labelFormatter={(label) => label.replace('-', '/').slice(2)} />
                       <Legend verticalAlign="top" height={36} />
-                      <Line type="monotone" dataKey="Paint" stroke="#f97316" strokeWidth={2} dot={false} activeDot={{ r: 5 }} connectNulls={true} />
-                      <Line type="monotone" dataKey="Mid" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 5 }} connectNulls={true} />
-                      <Line type="monotone" dataKey="3PT" stroke="#22c55e" strokeWidth={2} dot={false} activeDot={{ r: 5 }} connectNulls={true} />
+                      <Line type="monotone" dataKey="Paint" stroke="#f97316" strokeWidth={2} dot={(props) => props.payload.Paint !== null ? <circle key={props.key} cx={props.cx} cy={props.cy} r={3} fill="#f97316" stroke="#fff" strokeWidth={2} /> : <g key={props.key} />} activeDot={{ r: 5 }} connectNulls={true} />
+                      <Line type="monotone" dataKey="Mid" stroke="#3b82f6" strokeWidth={2} dot={(props) => props.payload.Mid !== null ? <circle key={props.key} cx={props.cx} cy={props.cy} r={3} fill="#3b82f6" stroke="#fff" strokeWidth={2} /> : <g key={props.key} />} activeDot={{ r: 5 }} connectNulls={true} />
+                      <Line type="monotone" dataKey="3PT" stroke="#22c55e" strokeWidth={2} dot={(props) => props.payload['3PT'] !== null ? <circle key={props.key} cx={props.cx} cy={props.cy} r={3} fill="#22c55e" stroke="#fff" strokeWidth={2} /> : <g key={props.key} />} activeDot={{ r: 5 }} connectNulls={true} />
                     </LineChart>
                  </ResponsiveContainer>
                </div>
