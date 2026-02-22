@@ -278,7 +278,7 @@ export default function App() {
                       <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(val) => val.slice(5).replace('-', '/')} axisLine={false} tickLine={false} dy={10} interval={6} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickFormatter={(val) => `${val}%`} axisLine={false} tickLine={false} dx={-5} />
                       <Tooltip formatter={(val) => val !== null ? `${val}%` : '—'} labelFormatter={(label) => label.replace('-', '/').slice(2)} />
-                      <Line type="monotone" dataKey="pct" stroke="#ea580c" strokeWidth={3} dot={(props) => props.payload.pct !== null ? <circle key={props.key} cx={props.cx} cy={props.cy} r={4} fill="#ea580c" stroke="#fff" strokeWidth={2} /> : <g key={props.key} />} activeDot={{ r: 6 }} connectNulls={false} />
+                      <Line type="monotone" dataKey="pct" stroke="#ea580c" strokeWidth={3} dot={(props) => props.payload.pct !== null ? <circle key={props.key} cx={props.cx} cy={props.cy} r={4} fill="#ea580c" stroke="#fff" strokeWidth={2} /> : <g key={props.key} />} activeDot={{ r: 6 }} connectNulls={true} />
                     </LineChart>
                  </ResponsiveContainer>
                </div>
